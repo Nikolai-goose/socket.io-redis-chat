@@ -18,6 +18,7 @@
     },
     "globals": {
         "window": "writable",
-        "document": "writable"
+        "document": "writable",
+        "$": "writable"
     }
 }
