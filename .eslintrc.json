@@ -1,0 +1,23 @@
+{
+    "extends": ["airbnb-base", "prettier"],
+    "plugins": ["prettier"],
+    "rules": {
+        "camelcase": 0,
+        "no-nested-ternary": "off",
+        "no-useless-catch": "off",
+        "prettier/prettier": "error",
+        "no-unused-vars": "warn",
+        "no-console": "off",
+        "func-names": "off",
+        "no-process-exit": "off",
+        "object-shorthand": "off",
+        "class-methods-use-this": "off",
+        "no-await-in-loop": "off",
+        "no-param-reassign": "off",
+        "radix": 0
+    },
+    "globals": {
+        "window": "writable",
+        "document": "writable"
+    }
+}
