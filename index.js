@@ -5,9 +5,14 @@ const app = express();
 const path = require('path');
 const server = require('http').createServer(app);
 const io = require('socket.io')(server);
-const redis = require('socket.io-redis');
+const { createClient } = require('redis');
+const redisAdapter = require('@socket.io/redis-adapter');
 
-io.adapter(redis({ host: process.env.REDIS_ENDPOINT, port: 6379 }));
+console.log(111);
+const pubClient = createClient({ host: process.env.REDIS_ENDPOINT, port: 6379 });
+console.log(111);
+const subClient = pubClient.duplicate();
+io.adapter(redisAdapter(pubClient, subClient));
 
 const Presence = require('./lib/presence');
 

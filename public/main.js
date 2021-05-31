@@ -1,4 +1,5 @@
 /* global io */
+/* eslint-disable no-use-before-define */
 $(() => {
     const FADE_TIME = 150; // ms
     const TYPING_TIMER_LENGTH = 400; // ms
@@ -42,18 +43,83 @@ $(() => {
         } else {
             message += `there are ${data.numUsers} participants`;
         }
-        console.log(message);
+        log(message);
     }
 
-    // Prevents input from having injected markup
-    function cleanInput(input) {
-        return $('<div/>').text(input).html();
+    // Sets the client's username
+    function setUsername() {
+        username = cleanInput($usernameInput.val().trim());
+
+        // If the username is valid
+        if (username) {
+            $loginPage.fadeOut();
+            $chatPage.show();
+            $loginPage.off('click');
+            $currentInput = $inputMessage.focus();
+
+            // Tell the server your username
+            socket.emit('add user', username);
+        }
     }
 
-    // Gets the 'X is typing' messages of a user
-    function getTypingMessages(data) {
-        return $('.typing.message').filter(function (i) {
-            return $(this).data('username') === data.username;
+    // Sends a chat message
+    function sendMessage() {
+        let message = $inputMessage.val();
+        // Prevent markup from being injected into the message
+        message = cleanInput(message);
+        // if there is a non-empty message and a socket connection
+        if (message && connected) {
+            $inputMessage.val('');
+            addChatMessage({
+                username: username,
+                message: message,
+            });
+            // tell server to execute 'new message' and send along one parameter
+            socket.emit('new message', message);
+        }
+    }
+
+    // Log a message
+    function log(message, options) {
+        const $el = $('<li>').addClass('log').text(message);
+        addMessageElement($el, options);
+    }
+
+    // Adds the visual chat message to the message list
+    function addChatMessage(data, options) {
+        // Don't fade the message in if there is an 'X was typing'
+        const $typingMessages = getTypingMessages(data);
+        options = options || {};
+        if ($typingMessages.length !== 0) {
+            options.fade = false;
+            $typingMessages.remove();
+        }
+
+        const $usernameDiv = $('<span class="username"/>')
+            .text(data.username)
+            .css('color', getUsernameColor(data.username));
+        const $messageBodyDiv = $('<span class="messageBody">').text(data.message);
+
+        const typingClass = data.typing ? 'typing' : '';
+        const $messageDiv = $('<li class="message"/>')
+            .data('username', data.username)
+            .addClass(typingClass)
+            .append($usernameDiv, $messageBodyDiv);
+
+        addMessageElement($messageDiv, options);
+    }
+
+    // Adds the visual chat typing message
+    function addChatTyping(data) {
+        data.typing = true;
+        data.message = 'is typing';
+        addChatMessage(data);
+    }
+
+    // Removes the visual chat typing message
+    function removeChatTyping(data) {
+        getTypingMessages(data).fadeOut(function () {
+            $(this).remove();
         });
     }
 
@@ -88,94 +154,9 @@ $(() => {
         $messages[0].scrollTop = $messages[0].scrollHeight;
     }
 
-    // Sets the client's username
-    function setUsername() {
-        username = cleanInput($usernameInput.val().trim());
-
-        // If the username is valid
-        if (username) {
-            $loginPage.fadeOut();
-            $chatPage.show();
-            $loginPage.off('click');
-            $currentInput = $inputMessage.focus();
-
-            // Tell the server your username
-            socket.emit('add user', username);
-        }
-    }
-
-    // Gets the color of a username through our hash function
-    function getUsernameColor(u) {
-        // Compute hash code
-        let hash = 7;
-        for (let i = 0; i < u.length; i += 1) {
-            // eslint-disable-next-line no-bitwise
-            hash = u.charCodeAt(i) + (hash << 5) - hash;
-        }
-        // Calculate color
-        const index = Math.abs(hash % COLORS.length);
-        return COLORS[index];
-    }
-
-    // Adds the visual chat message to the message list
-    function addChatMessage(data, options) {
-        // Don't fade the message in if there is an 'X was typing'
-        const $typingMessages = getTypingMessages(data);
-        options = options || {};
-        if ($typingMessages.length !== 0) {
-            options.fade = false;
-            $typingMessages.remove();
-        }
-
-        const $usernameDiv = $('<span class="username"/>')
-            .text(data.username)
-            .css('color', getUsernameColor(data.username));
-        const $messageBodyDiv = $('<span class="messageBody">').text(data.message);
-
-        const typingClass = data.typing ? 'typing' : '';
-        const $messageDiv = $('<li class="message"/>')
-            .data('username', data.username)
-            .addClass(typingClass)
-            .append($usernameDiv, $messageBodyDiv);
-
-        addMessageElement($messageDiv, options);
-    }
-
-    // Sends a chat message
-    function sendMessage() {
-        let message = $inputMessage.val();
-        // Prevent markup from being injected into the message
-        message = cleanInput(message);
-        // if there is a non-empty message and a socket connection
-        if (message && connected) {
-            $inputMessage.val('');
-            addChatMessage({
-                username: username,
-                message: message,
-            });
-            // tell server to execute 'new message' and send along one parameter
-            socket.emit('new message', message);
-        }
-    }
-
-    // Log a message
-    function log(message, options) {
-        const $el = $('<li>').addClass('log').text(message);
-        addMessageElement($el, options);
-    }
-
-    // Adds the visual chat typing message
-    function addChatTyping(data) {
-        data.typing = true;
-        data.message = 'is typing';
-        addChatMessage(data);
-    }
-
-    // Removes the visual chat typing message
-    function removeChatTyping(data) {
-        getTypingMessages(data).fadeOut(function () {
-            $(this).remove();
-        });
+    // Prevents input from having injected markup
+    function cleanInput(input) {
+        return $('<div/>').text(input).html();
     }
 
     // Updates the typing event
@@ -196,6 +177,26 @@ $(() => {
                 }
             }, TYPING_TIMER_LENGTH);
         }
+    }
+
+    // Gets the 'X is typing' messages of a user
+    function getTypingMessages(data) {
+        return $('.typing.message').filter(function (i) {
+            return $(this).data('username') === data.username;
+        });
+    }
+
+    // Gets the color of a username through our hash function
+    function getUsernameColor(u) {
+        // Compute hash code
+        let hash = 7;
+        for (let i = 0; i < u.length; i += 1) {
+            // eslint-disable-next-line no-bitwise
+            hash = u.charCodeAt(i) + (hash << 5) - hash;
+        }
+        // Calculate color
+        const index = Math.abs(hash % COLORS.length);
+        return COLORS[index];
     }
 
     // Keyboard events
