@@ -1,20 +1,29 @@
 {
   "name": "socketio-library-and-chat",
   "version": "0.0.0",
-  "description": "A simple chat client using socket.io",
+  "description": "A simple library with chat client using socket.io",
   "main": "index.js",
   "author": "Grant Timmerman",
   "private": true,
   "license": "BSD",
   "scripts": {
-    "start": "docker run -d --name socketio-library -p 3000:3000 socketio-library",
-    "stop": "docker stop socketio-library && docker rm socketio-library",
-    "build": "docker build -t socketio-library .",
-    "dev": "nodemon index.js"
+    "build": "docker build -t library .",
+    "dev": "npm run start:network && npm run start:redis && npm run start:instance1 && npm run start:instance2",
+    "start:network": "docker network create libraryapp",
+    "start:redis": "docker run -d --net=libraryapp --name redis redis",
+    "start:instance1": "docker run -d --net=libraryapp --name library1 -p 3000:3000 -e \"REDIS_ENDPOINT=redis\" library",
+    "start:instance2": "docker run -d --net=libraryapp --name library2 -p 3001:3000 -e \"REDIS_ENDPOINT=redis\" library",
+    "stop": "npm run stop:redis && npm run stop:instance1 && npm run stop:instance2 && npm run stop:network",
+    "stop:redis": "docker stop redis && docker rm redis",
+    "stop:instance1": "docker stop library1 && docker rm library1",
+    "stop:instance2": "docker stop library2 && docker rm library2",
+    "stop:network": "docker network rm libraryapp"
   },
   "dependencies": {
     "express": "~4.17.1",
-    "socket.io": "^4.0.0"
+    "redis": "^3.1.2",
+    "socket.io": "^4.1.2",
+    "socket.io-redis": "5.2.0"
   },
   "devDependencies": {
     "eslint": "^7.27.0",

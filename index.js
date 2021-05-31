@@ -5,6 +5,11 @@ const app = express();
 const path = require('path');
 const server = require('http').createServer(app);
 const io = require('socket.io')(server);
+const redis = require('socket.io-redis');
+
+io.adapter(redis({ host: process.env.REDIS_ENDPOINT, port: 6379 }));
+
+const Presence = require('./lib/presence');
 
 const port = process.env.PORT || 3000;
 
@@ -15,8 +20,6 @@ server.listen(port, () => {
 // Routing
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Chatroom
-let numUsers = 0;
 io.on('connection', (socket) => {
     let addedUser = false;
 
@@ -29,21 +32,40 @@ io.on('connection', (socket) => {
         });
     });
 
+    socket.conn.on('heartbeat', () => {
+        if (!addedUser) {
+            // Don't start upserting until the user has added themselves.
+            return;
+        }
+
+        Presence.upsert(socket.id, {
+            username: socket.username,
+        });
+    });
+
     // when the client emits 'add user', this listens and executes
     socket.on('add user', (username) => {
-        if (addedUser) return;
+        if (addedUser) {
+            return;
+        }
 
         // we store the username in the socket session for this client
         socket.username = username;
-        numUsers += 1;
-        addedUser = true;
-        socket.emit('login', {
-            numUsers: numUsers,
-        });
-        // echo globally (all clients) that a person has connected
-        socket.broadcast.emit('user joined', {
+        Presence.upsert(socket.id, {
             username: socket.username,
-            numUsers: numUsers,
+        });
+        addedUser = true;
+
+        Presence.list((users) => {
+            socket.emit('login', {
+                numUsers: users.length,
+            });
+
+            // echo globally (all clients) that a person has connected
+            socket.broadcast.emit('user joined', {
+                username: socket.username,
+                numUsers: users.length,
+            });
         });
     });
 
@@ -64,12 +86,14 @@ io.on('connection', (socket) => {
     // when the user disconnects.. perform this
     socket.on('disconnect', () => {
         if (addedUser) {
-            numUsers -= 1;
+            Presence.remove(socket.id);
 
-            // echo globally that this client has left
-            socket.broadcast.emit('user left', {
-                username: socket.username,
-                numUsers: numUsers,
+            Presence.list((users) => {
+                // echo globally (all clients) that a person has connected
+                socket.broadcast.emit('user left', {
+                    username: socket.username,
+                    numUsers: users.length,
+                });
             });
         }
     });
